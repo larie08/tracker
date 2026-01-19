@@ -1,6 +1,6 @@
 # UI/UX Internship Hours Tracker
 
-Track your progress towards 540 internship hours with this beautiful, easy-to-use tracker.
+Track my progress towards 540 UI/UX internship hours with this easy-to-use tracker.
 
 ## Getting Started
 
