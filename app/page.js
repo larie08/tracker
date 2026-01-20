@@ -17,8 +17,16 @@ export default function InternshipTracker() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   
+  const [projects, setProjects] = useState([]);
+  const [newProject, setNewProject] = useState({
+    name: '',
+    status: 'in-progress'
+  });
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState({
+    projectId: null,
     task: '',
     deadline: '',
     completed: false
@@ -43,6 +51,12 @@ export default function InternshipTracker() {
       saveTodos();
     }
   }, [todos]);
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      saveProjects();
+    }
+  }, [projects]);
 
   const loadData = () => {
     try {
@@ -71,6 +85,14 @@ export default function InternshipTracker() {
     }
   };
 
+  const saveProjects = () => {
+    try {
+      localStorage.setItem('internship-projects', JSON.stringify(projects));
+    } catch (error) {
+      console.error('Error saving projects:', error);
+    }
+  };
+
   useEffect(() => {
     try {
       const result = localStorage.getItem('internship-todos');
@@ -79,6 +101,17 @@ export default function InternshipTracker() {
       }
     } catch (error) {
       console.log('No todos found');
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const result = localStorage.getItem('internship-projects');
+      if (result) {
+        setProjects(JSON.parse(result));
+      }
+    } catch (error) {
+      console.log('No projects found');
     }
   }, []);
 
@@ -117,21 +150,56 @@ export default function InternshipTracker() {
   };
 
   const addTodo = () => {
-    if (newTodo.task && newTodo.deadline) {
+    if (selectedProjectId && newTodo.task && newTodo.deadline) {
       setTodos([
         ...todos,
         {
           id: Date.now(),
+          projectId: selectedProjectId,
           task: newTodo.task,
           deadline: newTodo.deadline,
           completed: false
         }
       ]);
       setNewTodo({
+        projectId: selectedProjectId,
         task: '',
         deadline: '',
         completed: false
       });
+    }
+  };
+
+  const addProject = () => {
+    if (newProject.name) {
+      setProjects([
+        ...projects,
+        {
+          id: Date.now(),
+          name: newProject.name,
+          status: 'in-progress',
+          createdAt: new Date().toISOString()
+        }
+      ]);
+      setNewProject({
+        name: '',
+        status: 'in-progress'
+      });
+      setSelectedProjectId(null);
+    }
+  };
+
+  const updateProjectStatus = (projectId, status) => {
+    setProjects(projects.map(project =>
+      project.id === projectId ? { ...project, status } : project
+    ));
+  };
+
+  const deleteProject = (projectId) => {
+    setProjects(projects.filter(project => project.id !== projectId));
+    setTodos(todos.filter(todo => todo.projectId !== projectId));
+    if (selectedProjectId === projectId) {
+      setSelectedProjectId(null);
     }
   };
 
@@ -161,6 +229,10 @@ export default function InternshipTracker() {
   const cancelTodoEdit = () => {
     setEditingTodoId(null);
     setEditTodoForm({});
+  };
+
+  const getProjectTodos = (projectId) => {
+    return todos.filter(todo => todo.projectId === projectId);
   };
 
   const deleteEntry = (id) => {
@@ -466,112 +538,241 @@ export default function InternshipTracker() {
         <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
-            My Tasks
+            My Projects
           </h2>
 
-          {/* Add New To-Do */}
+          {/* Add New Project */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-md font-semibold text-gray-700 mb-3">Add New Task</h3>
+            <h3 className="text-md font-semibold text-gray-700 mb-3">Create New Project</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input
                 type="text"
-                value={newTodo.task}
-                onChange={(e) => setNewTodo({...newTodo, task: e.target.value})}
-                placeholder="Enter task description..."
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="date"
-                value={newTodo.deadline}
-                onChange={(e) => setNewTodo({...newTodo, deadline: e.target.value})}
+                value={newProject.name}
+                onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                placeholder="Enter project name..."
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <button
-                onClick={addTodo}
+                onClick={addProject}
                 className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all"
               >
-                Add Task
+                Create Project
               </button>
             </div>
           </div>
 
-          {/* To-Do List */}
-          {todos.length === 0 ? (
+          {/* Projects Display */}
+          {projects.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <Circle className="w-12 h-12 mx-auto mb-2 opacity-30" />
-              <p>No tasks yet. Add one to get started!</p>
+              <p>No projects yet. Create one to get started!</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {todos.map((todo) => (
-                <div key={todo.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                  {editingTodoId === todo.id ? (
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        value={editTodoForm.task}
-                        onChange={(e) => setEditTodoForm({...editTodoForm, task: e.target.value})}
-                        className="px-3 py-1 border border-gray-300 rounded text-sm"
-                      />
-                      <input
-                        type="date"
-                        value={editTodoForm.deadline}
-                        onChange={(e) => setEditTodoForm({...editTodoForm, deadline: e.target.value})}
-                        className="px-3 py-1 border border-gray-300 rounded text-sm"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveTodoEdit}
-                          className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 flex items-center justify-center gap-1"
-                        >
-                          <Save className="w-4 h-4" /> Save
-                        </button>
-                        <button
-                          onClick={cancelTodoEdit}
-                          className="flex-1 px-2 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 flex items-center justify-center gap-1"
-                        >
-                          <X className="w-4 h-4" /> Cancel
-                        </button>
-                      </div>
-                    </div>
+            <div className="space-y-4">
+              {/* In Progress Projects */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  In Progress
+                </h3>
+                <div className="space-y-3">
+                  {projects.filter(p => p.status === 'in-progress').length === 0 ? (
+                    <p className="text-gray-400 text-sm">No active projects</p>
                   ) : (
-                    <>
-                      <button
-                        onClick={() => toggleTodo(todo.id)}
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        {todo.completed ? (
-                          <CheckCircle2 className="w-5 h-5" />
-                        ) : (
-                          <Circle className="w-5 h-5" />
+                    projects.filter(p => p.status === 'in-progress').map(project => (
+                      <div key={project.id} className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h4 className="text-md font-bold text-gray-800">{project.name}</h4>
+                            <p className="text-xs text-gray-500">
+                              {getProjectTodos(project.id).length} task(s) • {getProjectTodos(project.id).filter(t => t.completed).length} completed
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => updateProjectStatus(project.id, 'completed')}
+                              className="px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 font-semibold"
+                            >
+                              Mark Complete
+                            </button>
+                            <button
+                              onClick={() => deleteProject(project.id)}
+                              className="text-red-600 hover:text-red-700 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Add Task to Project */}
+                        {selectedProjectId === project.id && (
+                          <div className="mb-3 p-3 bg-white rounded border border-blue-300">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                              <input
+                                type="text"
+                                value={newTodo.task}
+                                onChange={(e) => setNewTodo({...newTodo, task: e.target.value})}
+                                placeholder="Task description..."
+                                className="px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                              />
+                              <input
+                                type="date"
+                                value={newTodo.deadline}
+                                onChange={(e) => setNewTodo({...newTodo, deadline: e.target.value})}
+                                className="px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={addTodo}
+                                  className="flex-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 font-semibold"
+                                >
+                                  Add Task
+                                </button>
+                                <button
+                                  onClick={() => setSelectedProjectId(null)}
+                                  className="flex-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400 font-semibold"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         )}
-                      </button>
-                      <div className="flex-1">
-                        <p className={`font-medium ${todo.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                          {todo.task}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Due: {new Date(todo.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
+
+                        {selectedProjectId !== project.id && (
+                          <button
+                            onClick={() => {
+                              setSelectedProjectId(project.id);
+                              setNewTodo({...newTodo, projectId: project.id});
+                            }}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-semibold mb-3"
+                          >
+                            + Add Task
+                          </button>
+                        )}
+
+                        {/* Tasks List */}
+                        {getProjectTodos(project.id).length === 0 ? (
+                          <p className="text-gray-400 text-xs italic">No tasks yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {getProjectTodos(project.id).map((todo) => (
+                              <div key={todo.id} className="flex items-center gap-2 p-2 bg-white rounded border border-gray-200">
+                                {editingTodoId === todo.id ? (
+                                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <input
+                                      type="text"
+                                      value={editTodoForm.task}
+                                      onChange={(e) => setEditTodoForm({...editTodoForm, task: e.target.value})}
+                                      className="px-2 py-1 border border-gray-300 rounded text-xs"
+                                    />
+                                    <input
+                                      type="date"
+                                      value={editTodoForm.deadline}
+                                      onChange={(e) => setEditTodoForm({...editTodoForm, deadline: e.target.value})}
+                                      className="px-2 py-1 border border-gray-300 rounded text-xs"
+                                    />
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={saveTodoEdit}
+                                        className="flex-1 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        onClick={cancelTodoEdit}
+                                        className="flex-1 px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        const updated = todos.map(t => t.id === todo.id ? {...t, completed: !t.completed} : t);
+                                        setTodos(updated);
+                                      }}
+                                      className="text-blue-600 hover:text-blue-700 flex-shrink-0"
+                                    >
+                                      {todo.completed ? (
+                                        <CheckCircle2 className="w-4 h-4" />
+                                      ) : (
+                                        <Circle className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-xs font-medium truncate ${todo.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                        {todo.task}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {new Date(todo.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                      </p>
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                      <button
+                                        onClick={() => editTodo(todo)}
+                                        className="text-blue-600 hover:text-blue-700 p-0.5"
+                                      >
+                                        <Edit2 className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => setTodos(todos.filter(t => t.id !== todo.id))}
+                                        className="text-red-600 hover:text-red-700 p-0.5"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => editTodo(todo)}
-                          className="text-blue-600 hover:text-blue-700 p-1"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteTodo(todo.id)}
-                          className="text-red-600 hover:text-red-700 p-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </>
+                    ))
                   )}
                 </div>
-              ))}
+              </div>
+
+              {/* Completed Projects */}
+              {projects.filter(p => p.status === 'completed').length > 0 && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    Completed
+                  </h3>
+                  <div className="space-y-3">
+                    {projects.filter(p => p.status === 'completed').map(project => (
+                      <div key={project.id} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="text-md font-bold text-gray-700 line-through">{project.name}</h4>
+                            <p className="text-xs text-gray-500">
+                              {getProjectTodos(project.id).length} task(s) • {getProjectTodos(project.id).filter(t => t.completed).length} completed
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => updateProjectStatus(project.id, 'in-progress')}
+                              className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 font-semibold"
+                            >
+                              Reopen
+                            </button>
+                            <button
+                              onClick={() => deleteProject(project.id)}
+                              className="text-red-600 hover:text-red-700 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
